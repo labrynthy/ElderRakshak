@@ -85,6 +85,8 @@ ipython_config.py
 # Sensitive credential files
 client_secret.json
 token.json
+/.streamlit/secrets.toml
+
 
 # Environment files
 .env

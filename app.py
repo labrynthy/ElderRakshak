@@ -68,7 +68,6 @@ def translate_text(text: str, dest_lang: str) -> str:
 # Authenticating Gmail API with Redirect Flow
 def authenticate_gmail() -> object:
     try:
-        # OAuth 2.0 Flow with redirect
         flow = InstalledAppFlow.from_client_config(
             {
                 "web": {
@@ -81,23 +80,15 @@ def authenticate_gmail() -> object:
             },
             SCOPES,
         )
-
-        # URL for user to authorize access
         auth_url, _ = flow.authorization_url(prompt='consent')
-
-        # Streamlit UI for the redirect-based flow
         st.info("Click the link below to authenticate with Gmail:")
         st.markdown(f"[Authorize Gmail Access]({auth_url})", unsafe_allow_html=True)
-
-        # Extract the authorization code from the URL
         code = st.experimental_get_query_params().get('code', [None])[0]
-        
         if code:
-            # Exchange the authorization code for tokens
-            flow.fetch_token(authorization_response=st.experimental_get_url())
+            authorization_response = st.experimental_get_url()
+            flow.fetch_token(authorization_response=authorization_response)
             creds = flow.credentials
-
-            # Build the Gmail service
+            
             service = build('gmail', 'v1', credentials=creds)
             st.success("Authentication successful!")
             return service

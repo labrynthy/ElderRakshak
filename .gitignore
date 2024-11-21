@@ -82,10 +82,12 @@ target/
 profile_default/
 ipython_config.py
 
-# Sensitive credential files
+# Streamlit secrets file
+/.streamlit/secrets.toml
+
+# Sensitive credentials files
 client_secret.json
 token.json
-/.streamlit/secrets.toml
 
 
 # Environment files

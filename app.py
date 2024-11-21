@@ -222,9 +222,10 @@ elif option == "SMS Text":
                     st.write(translate_text("You can report this SMS at:", language), report_url)
                     st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
                 else:
-                    st.success(f"This SMS is **{prob_not_smishing * 100:.2f}%** safe.")
+                    st.success(translate_text(f"This SMS is **{prob_not_smishing * 100:.2f}%** safe.", language))  # Now translated
         else:
             st.warning(translate_text("Please enter an SMS text.", language))
+
             
 elif option == translate_text('Check Gmail', language):
     # Gmail section

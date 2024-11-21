@@ -68,12 +68,17 @@ def translate_text(text: str, dest_lang: str) -> str:
 # Authenticating Gmail API with Redirect Flow
 def authenticate_gmail() -> object:
     try:
+        # Retrieve OAuth credentials from Streamlit secrets
+        client_id = st.secrets["gmail"]["client_id"]
+        client_secret = st.secrets["gmail"]["client_secret"]
+        redirect_uris = st.secrets["gmail"]["redirect_uris"]  # Redirect URI from secrets.toml
+
         flow = InstalledAppFlow.from_client_config(
             {
                 "web": {
-                    "client_id": st.secrets["gmail"]["client_id"],
-                    "client_secret": st.secrets["gmail"]["client_secret"],
-                    "redirect_uris": ["https://elderrakshak.streamlit.app/"],  # Match Streamlit's URI
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uris": redirect_uris,  # Now using secrets
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }
@@ -83,12 +88,13 @@ def authenticate_gmail() -> object:
         auth_url, _ = flow.authorization_url(prompt='consent')
         st.info("Click the link below to authenticate with Gmail:")
         st.markdown(f"[Authorize Gmail Access]({auth_url})", unsafe_allow_html=True)
+        
+        # Handle the response code
         code = st.experimental_get_query_params().get('code', [None])[0]
         if code:
             authorization_response = st.experimental_get_url()
             flow.fetch_token(authorization_response=authorization_response)
             creds = flow.credentials
-            
             service = build('gmail', 'v1', credentials=creds)
             st.success("Authentication successful!")
             return service

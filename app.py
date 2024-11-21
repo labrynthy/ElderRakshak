@@ -74,34 +74,35 @@ def authenticate_gmail() -> object:
                 "web": {
                     "client_id": st.secrets["gmail"]["client_id"],
                     "client_secret": st.secrets["gmail"]["client_secret"],
-                    "redirect_uris": ["https://elderrakshak.streamlit.app/"],  # Match Streamlit's local server port
+                    "redirect_uris": ["https://elderrakshak.streamlit.app/"],  # Match Streamlit's URI
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }
             },
             SCOPES,
         )
-        
+
         # URL for user to authorize access
         auth_url, _ = flow.authorization_url(prompt='consent')
-        
+
         # Streamlit UI for the redirect-based flow
         st.info("Click the link below to authenticate with Gmail:")
         st.markdown(f"[Authorize Gmail Access]({auth_url})", unsafe_allow_html=True)
+
+        # Extract the authorization code from the URL
+        code = st.experimental_get_query_params().get('code', [None])[0]
         
-        # Input for the authorization code
-        code = st.text_input("Enter the authorization code:")
         if code:
             # Exchange the authorization code for tokens
-            flow.fetch_token(code=code)
+            flow.fetch_token(authorization_response=st.experimental_get_url())
             creds = flow.credentials
-            
+
             # Build the Gmail service
             service = build('gmail', 'v1', credentials=creds)
             st.success("Authentication successful!")
             return service
         else:
-            st.warning("Please complete the authentication flow.")
+            st.warning("Please complete the authentication flow by clicking the authorization link.")
             return None
 
     except Exception as e:

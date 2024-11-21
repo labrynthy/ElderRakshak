@@ -71,7 +71,7 @@ def authenticate_gmail() -> object:
         # Retrieve OAuth credentials from Streamlit secrets
         client_id = st.secrets["gmail"]["client_id"]
         client_secret = st.secrets["gmail"]["client_secret"]
-        redirect_uris = st.secrets["gmail"]["redirect_uris"]  # Get redirect URIs from secrets.toml
+        redirect_uris = st.secrets["gmail"]["redirect_uris"][0]  # Get redirect URIs from secrets.toml
 
         # Initialize the OAuth flow
         flow = InstalledAppFlow.from_client_config(

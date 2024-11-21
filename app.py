@@ -20,8 +20,8 @@ warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 
 # Using Streamlit secrets for sensitive information
-client_secret_file = st.secrets["gmail"]["client_secret"]
-token_file = st.secrets["gmail"]["token"]
+client_secret = st.secrets["gmail"]["client_secret"]
+token = st.secrets["gmail"]["token"]
 
 # Loading the model
 def load_model(model_path: str) -> object:

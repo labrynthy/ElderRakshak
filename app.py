@@ -21,10 +21,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 
-# Using Streamlit secrets for sensitive information
-client_secret = st.secrets["gmail"]["client_secret"]
-token = st.secrets["gmail"]["token"]
-
 # Loading the model
 def load_model(phishing_model_path: str) -> object:
     try:
@@ -69,38 +65,45 @@ def translate_text(text: str, dest_lang: str) -> str:
     target_lang = lang_dict.get(dest_lang, 'en')  
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
 
-# Authenticating Gmail API
+# Authenticating Gmail API with Redirect Flow
 def authenticate_gmail() -> object:
     try:
-        # Create temporary directory and files
-        temp_dir = tempfile.mkdtemp()
+        # OAuth 2.0 Flow with redirect
+        flow = InstalledAppFlow.from_client_config(
+            {
+                "web": {
+                    "client_id": st.secrets["gmail"]["client_id"],
+                    "client_secret": st.secrets["gmail"]["client_secret"],
+                    "redirect_uris": ["http://localhost:8501"],  # Match Streamlit's local server port
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            },
+            SCOPES,
+        )
         
-        # Create temporary client secret file
-        client_secret_path = os.path.join(temp_dir, 'client_secret.json')
-        with open(client_secret_path, 'w') as f:
-            f.write(st.secrets["gmail"]["client_secret"])
+        # URL for user to authorize access
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        
+        # Streamlit UI for the redirect-based flow
+        st.info("Click the link below to authenticate with Gmail:")
+        st.markdown(f"[Authorize Gmail Access]({auth_url})", unsafe_allow_html=True)
+        
+        # Input for the authorization code
+        code = st.text_input("Enter the authorization code:")
+        if code:
+            # Exchange the authorization code for tokens
+            flow.fetch_token(code=code)
+            creds = flow.credentials
             
-        # Create temporary token file
-        token_path = os.path.join(temp_dir, 'token.json')
-        with open(token_path, 'w') as f:
-            f.write(st.secrets["gmail"]["token"])
-        
-        # Use the temporary client secret file for authentication
-        flow = InstalledAppFlow.from_client_secrets_file(client_secret_path, SCOPES)
-        creds = flow.run_local_server(port=0)
-        
-        # Build and return the service
-        service = build('gmail', 'v1', credentials=creds)
-        
-        # Clean up temporary files
-        try:
-            os.remove(client_secret_path)
-            os.remove(token_path)
-            os.rmdir(temp_dir)
-        except:
-            pass
-            
-        return service
+            # Build the Gmail service
+            service = build('gmail', 'v1', credentials=creds)
+            st.success("Authentication successful!")
+            return service
+        else:
+            st.warning("Please complete the authentication flow.")
+            return None
+
     except Exception as e:
         logging.error(f"Authentication failed: {str(e)}")
         st.error(f"Authentication failed: {str(e)}")

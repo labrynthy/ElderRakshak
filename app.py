@@ -24,12 +24,12 @@ client_secret_file = st.secrets["gmail"]["client_secret"]
 token_file = st.secrets["gmail"]["token"]
 
 # Loading the model
-def load_model(model_path: str) -> object:
+def load_model(phishing_model_path: str) -> object:
     try:
-        with open(model_path, "rb") as file:
+        with open(phishing_model_path, "rb") as file:
             return pickle.load(file)
     except FileNotFoundError:
-        logging.error(f"Model file not found: {model_path}")
+        logging.error(f"Model file not found: {phishing_model_path}")
         st.error("Model file not found. Please check the path.")
         return None
     except pickle.UnpicklingError:
@@ -42,8 +42,8 @@ def load_model(model_path: str) -> object:
         return None
     
 # Using environment variable for model path
-model_path = os.getenv('MODEL_PATH', r"pickle/model_new.pkl")
-gbc = load_model(model_path)
+phishing_model_path = r"pickle/model_new.pkl"
+gbc = load_model(phishing_model_path)
 
 # Gmail API setup
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -71,7 +71,7 @@ def translate_text(text: str, dest_lang: str) -> str:
 def authenticate_gmail() -> object:
     try:
         # Get the client secret file path from Streamlit secrets // important
-        client_secret_file = st.secrets["gmail"]["client_secret_file"]
+        client_secret_file = st.secrets["gmail"]["client_secret"]
         flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES)
         creds = flow.run_local_server(port=0)
         return build('gmail', 'v1', credentials=creds)
@@ -115,7 +115,7 @@ def predict_link(link: str) -> tuple:
         raise
 
 # Loading smishing model and tokenizer
-smishing_model_path = os.getenv('SMISHING_MODEL_PATH', r"smishing_model")
+smishing_model_path = r"smishing_model"
 smishing_model = AutoModelForSequenceClassification.from_pretrained(smishing_model_path, trust_remote_code=True).to(device)
 tokenizer = AutoTokenizer.from_pretrained(smishing_model_path, trust_remote_code=True)
 

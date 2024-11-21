@@ -208,13 +208,13 @@ if option == translate_text('Enter URL', language):
 elif option == "SMS Text":
     # Input SMS text from user
     sms_text = st.text_area(translate_text("Enter the SMS text:", language))
-    if st.button(translate_text("Check SMS", language), help=translate_text("Click to analyze the SMS for smishing attempts.", language)):
+    if st.button(translate_text("Check SMS", language), help=translate_text("Click to analyze the SMS for scam attempts.", language)):
         if sms_text:
             with st.spinner(translate_text("Checking the SMS...", language)):
                 prob_smishing, prob_not_smishing = predict_smishing(sms_text)
                 if prob_smishing > prob_not_smishing:
                     report_url = "https://www.cybercrime.gov.in/"
-                    st.error(translate_text(f"It is **{prob_smishing * 100:.2f}%** likely to be a smishing attempt.", language))
+                    st.error(translate_text(f"It is **{prob_smishing * 100:.2f}%** likely to be a scam attempt.", language))
                     st.write(translate_text("You can report this SMS at:", language), report_url)
                     st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
                 else:

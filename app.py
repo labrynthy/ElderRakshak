@@ -6,8 +6,7 @@ import pickle
 import streamlit as st
 import numpy as np
 import torch
-import json 
-import tempfile
+
 from feature import FeatureExtraction
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build

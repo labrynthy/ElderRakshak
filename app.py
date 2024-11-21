@@ -42,7 +42,7 @@ def load_model(model_path: str) -> object:
         return None
     
 # Using environment variable for model path
-model_path = os.getenv('MODEL_PATH', r"pickle\model_new.pkl")
+model_path = os.getenv('MODEL_PATH', r"pickle/model_new.pkl")
 gbc = load_model(model_path)
 
 # Gmail API setup

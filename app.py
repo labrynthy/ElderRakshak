@@ -128,7 +128,7 @@ def predict_smishing(text: str) -> tuple:
     return scores[1], scores[0]  
 
 # Main title
-logo_path = os.getenv('LOGO_PATH', r"assets\LogoER.jpg")
+logo_path = os.getenv('LOGO_PATH', r"assets/LogoER.jpg")
 st.image(logo_path, width=350)
 
 # Language selection dropdown box

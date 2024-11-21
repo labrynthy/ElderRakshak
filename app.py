@@ -74,7 +74,7 @@ def authenticate_gmail() -> object:
                 "web": {
                     "client_id": st.secrets["gmail"]["client_id"],
                     "client_secret": st.secrets["gmail"]["client_secret"],
-                    "redirect_uris": ["http://localhost:8501"],  # Match Streamlit's local server port
+                    "redirect_uris": ["https://elderrakshak.streamlit.app/"],  # Match Streamlit's local server port
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }

@@ -6,6 +6,8 @@ import pickle
 import streamlit as st
 import numpy as np
 import torch
+import json 
+import tempfile
 from feature import FeatureExtraction
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -20,8 +22,8 @@ warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 
 # Using Streamlit secrets for sensitive information
-client_secret_file = st.secrets["gmail"]["client_secret"]
-token_file = st.secrets["gmail"]["token"]
+client_secret = st.secrets["gmail"]["client_secret"]
+token = st.secrets["gmail"]["token"]
 
 # Loading the model
 def load_model(phishing_model_path: str) -> object:
@@ -70,11 +72,35 @@ def translate_text(text: str, dest_lang: str) -> str:
 # Authenticating Gmail API
 def authenticate_gmail() -> object:
     try:
-        # Get the client secret file path from Streamlit secrets // important
-        client_secret_file = st.secrets["gmail"]["client_secret"]
-        flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES)
+        # Create temporary directory and files
+        temp_dir = tempfile.mkdtemp()
+        
+        # Create temporary client secret file
+        client_secret_path = os.path.join(temp_dir, 'client_secret.json')
+        with open(client_secret_path, 'w') as f:
+            f.write(st.secrets["gmail"]["client_secret"])
+            
+        # Create temporary token file
+        token_path = os.path.join(temp_dir, 'token.json')
+        with open(token_path, 'w') as f:
+            f.write(st.secrets["gmail"]["token"])
+        
+        # Use the temporary client secret file for authentication
+        flow = InstalledAppFlow.from_client_secrets_file(client_secret_path, SCOPES)
         creds = flow.run_local_server(port=0)
-        return build('gmail', 'v1', credentials=creds)
+        
+        # Build and return the service
+        service = build('gmail', 'v1', credentials=creds)
+        
+        # Clean up temporary files
+        try:
+            os.remove(client_secret_path)
+            os.remove(token_path)
+            os.rmdir(temp_dir)
+        except:
+            pass
+            
+        return service
     except Exception as e:
         logging.error(f"Authentication failed: {str(e)}")
         st.error(f"Authentication failed: {str(e)}")

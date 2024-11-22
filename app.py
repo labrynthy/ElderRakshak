@@ -7,8 +7,6 @@ import pickle
 import streamlit as st
 import numpy as np
 import torch
-
-from feature import FeatureExtraction
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -114,44 +112,28 @@ def google_sign_in():
 
 
 # Gmail Integration in 'Check Gmail'
-elif option == translate_text('Check Gmail', language):
-    st.subheader(translate_text("Authenticate using your Google Account", language))
-    token = google_sign_in()
-
-    if token:
-        # Fetch emails after successful login
-        service = build('gmail', 'v1', credentials=Credentials(token))
-        with st.spinner(translate_text("Fetching emails, please wait...", language)):
-            emails = fetch_gmail_emails(service)
-
-        if emails:
-            link_count = 1
-            for email in emails:
-                urls = extract_urls(email)
-                if urls:
-                    for url in urls:
-                        st.write(translate_text(f"Link {link_count}: {url}", language))
-                        y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
-                        if y_pred == 1:
-                            st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
-                        else:
-                            st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
-                            report_url = "https://www.cybercrime.gov.in/"
-                            st.write(translate_text("You can report this phishing link at:", language), report_url)
-                            st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
-                        link_count += 1
-        else:
-            st.warning(translate_text("No links found in your emails.", language))
-        
-# Extracting URLs from text with error handling
-def extract_urls(text: str) -> list:
+def fetch_gmail_emails(service):
     try:
-        return re.findall(r'(https?://\S+)', text)
-    except Exception as e:
-        logging.error(f"Error extracting URLs: {str(e)}")
-        st.error("Failed to extract URLs. Please check the email content.")
-        return []
+        results = service.users().messages().list(userId='me', labelIds=['INBOX'], q="is:unread").execute()
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return None
+        
+        emails = []
+        for message in messages:
+            msg = service.users().messages().get(userId='me', id=message['id']).execute()
+            email_data = msg['snippet']
+            emails.append(email_data)
+        return emails
+    except Exception as error:
+        st.error(f"An error occurred: {error}")
+        return None
 
+# Extracting URLs from text
+def extract_urls(text: str) -> list:
+    return re.findall(r'(https?://\S+)', text)
+    
 # Making predictions
 def predict_link(link: str) -> tuple:
     try:
@@ -212,23 +194,54 @@ if option == translate_text('Enter URL', language):
     # Input URL from user
     st.subheader(translate_text("Enter a URL to check:", language))
     url = st.text_input(translate_text("Enter the URL:", language))
-    if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing.", language)):
+    if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing or safety.", language)):
         if url:
-            y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
-            if y_pred == 1:
-                st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
-            else:
-                st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
-
-elif option == translate_text('SMS Text', language):
-    # Check SMS Text for phishing
-    st.subheader(translate_text("Enter SMS Text to check:", language))
-    sms_text = st.text_area(translate_text("Enter SMS content here", language), help=translate_text("Paste the content of the SMS here to check if it's a scam.", language))
-    if st.button(translate_text("Predict", language)):
+            with st.spinner(translate_text("Checking the URL...", language)):
+                y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
+                if y_pred == 1:
+                    st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
+                else:
+                    st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
+                    # Incident reporting for URL if unsafe
+                    report_url = "https://www.cybercrime.gov.in/"
+                    st.write(translate_text("You can report this link at:", language), report_url)
+                    st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
+        else:
+            st.warning(translate_text("Please enter a URL.", language))
+            
+elif option == "SMS Text":
+    # Input SMS text from user
+    sms_text = st.text_area(translate_text("Enter the SMS text:", language))
+    if st.button(translate_text("Check SMS", language), help=translate_text("Click to analyze the SMS for scam attempts.", language)):
         if sms_text:
-            smishing_score, non_smishing_score = predict_smishing(sms_text)
-            if smishing_score > non_smishing_score:
-                st.error(translate_text(f"This SMS is **smishing**. (Score: {smishing_score * 100:.2f}%)", language))
-            else:
-                st.success(translate_text(f"This SMS is **not smishing**. (Score: {non_smishing_score * 100:.2f}%)", language))
+            with st.spinner(translate_text("Checking SMS...", language)):
+                score_phishing, score_non_phishing = predict_smishing(sms_text)
+                if score_phishing > 0.5:
+                    st.error(translate_text(f"The SMS seems to be a **smishing** attempt with **{score_phishing * 100:.2f}%** likelihood.", language))
+                else:
+                    st.success(translate_text(f"The SMS appears to be **safe** with **{score_non_phishing * 100:.2f}%** confidence.", language))
+        else:
+            st.warning(translate_text("Please enter the SMS text.", language))
 
+elif option == translate_text('Check Gmail', language):
+    # Google Sign-In and Gmail integration
+    credentials = google_sign_in()
+    if credentials:
+        service = build('gmail', 'v1', credentials=credentials)
+        emails = fetch_gmail_emails(service)
+        if emails:
+            st.write(translate_text("Unread Emails", language))
+            for email in emails:
+                st.write(email)
+                urls = extract_urls(email)
+                if urls:
+                    for url in urls:
+                        y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
+                        if y_pred == 1:
+                            st.success(translate_text(f"Phishing link detected in the email: {url}.", language))
+                        else:
+                            st.success(translate_text(f"Safe link detected in the email: {url}.", language))
+                else:
+                    st.write(translate_text("No links found in this email.", language))
+        else:
+            st.warning(translate_text("No unread emails found.", language))

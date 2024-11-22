@@ -110,11 +110,15 @@ with st.expander(translate_text("Help", language)):
 st.title(translate_text("Phishing Link and Scam SMS Detector", language))
 st.write(translate_text("Welcome to ElderRakshak's Scam Detection Feature. Select your preferred method and start identifying potential phishing and smishing threats now!", language))
 
-# Option to input URL or check Gmail
-option = st.radio(translate_text("Choose input method:", language), (translate_text('Enter URL', language), translate_text('SMS Text', language)))
+# Option to input URL or check SMS
+option = st.radio(
+    translate_text("Choose input method:", language), 
+    (translate_text('Enter URL', language), translate_text('SMS Text', language))
+)
 
 st.markdown("---")
 
+# Adjusted option checks using English text keys for reliability
 if option == translate_text('Enter URL', language):
     # Input URL from user
     st.subheader(translate_text("Enter a URL to check:", language))
@@ -133,9 +137,10 @@ if option == translate_text('Enter URL', language):
                     st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
         else:
             st.warning(translate_text("Please enter a URL.", language))
-            
-elif option == "SMS Text":
+
+elif option == translate_text('SMS Text', language):
     # Input SMS text from user
+    st.subheader(translate_text("Enter the SMS text to check:", language))
     sms_text = st.text_area(translate_text("Enter the SMS text:", language))
     if st.button(translate_text("Check SMS", language), help=translate_text("Click to analyze the SMS for scam attempts.", language)):
         if sms_text:
@@ -147,6 +152,6 @@ elif option == "SMS Text":
                     st.write(translate_text("You can report this SMS at:", language), report_url)
                     st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
                 else:
-                    st.success(translate_text(f"This SMS is **{prob_not_smishing * 100:.2f}%** safe.", language))  # Now translated
+                    st.success(translate_text(f"This SMS is **{prob_not_smishing * 100:.2f}%** safe.", language))
         else:
             st.warning(translate_text("Please enter an SMS text.", language))

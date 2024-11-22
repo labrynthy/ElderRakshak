@@ -5,6 +5,7 @@ import warnings
 import tempfile
 import pickle
 import streamlit as st
+import streamlit.components.v1 as components
 import numpy as np
 import torch
 from google.oauth2.credentials import Credentials
@@ -65,9 +66,12 @@ def translate_text(text: str, dest_lang: str) -> str:
 
 # Google Sign-In HTML/JS Component
 def google_sign_in():
-    st.markdown("""
+    google_client_id = "<609520836677-6v4nkac463sdfkko2ifkfg9gn1jilcno.apps.googleusercontent.com>"  # Replace with your Google Client ID
+
+    # HTML and JavaScript for Google Sign-In Button
+    sign_in_html = f"""
     <div id="g_id_onload"
-        data-client_id="<609520836677-6v4nkac463sdfkko2ifkfg9gn1jilcno.apps.googleusercontent.com>"
+        data-client_id="{google_client_id}"
         data-context="signin"
         data-ux_mode="popup"
         data-callback="handleCredentialResponse"
@@ -82,17 +86,19 @@ def google_sign_in():
         data-logo_alignment="left">
     </div>
     <script>
-    function handleCredentialResponse(response) {
+    function handleCredentialResponse(response) {{
         const iframe = document.createElement("iframe");
         iframe.style.display = "none";
         iframe.src = "/?id_token=" + response.credential;
         document.body.appendChild(iframe);
-    }
+    }}
     </script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    """, unsafe_allow_html=True)
+    <script src="https://accounts.google.com/gsi/client" async defer></script>""
 
-    # Handle token retrieval from the query params
+    # Embed the sign-in button using Streamlit's components API
+    components.html(sign_in_html, height=500)
+
+    # Handle the token after successful sign-in
     id_token = st.experimental_get_query_params().get("id_token", [None])[0]
     if id_token:
         try:
@@ -100,7 +106,7 @@ def google_sign_in():
             from google.auth.transport.requests import Request
 
             # Validate and decode the token
-            info = google_id_token.verify_oauth2_token(id_token, Request(), "<YOUR_GOOGLE_CLIENT_ID>")
+            info = google_id_token.verify_oauth2_token(id_token, Request(), google_client_id)
             st.success(f"Welcome {info['email']}!")
             return id_token
         except ValueError:

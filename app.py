@@ -64,72 +64,7 @@ def translate_text(text: str, dest_lang: str) -> str:
     }
     target_lang = lang_dict.get(dest_lang, 'en')  
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
-
-# Authenticating Gmail API with Redirect Flow
-def authenticate_gmail() -> object:
-    try:
-        # Retrieve OAuth credentials from Streamlit secrets
-        client_id = st.secrets["gmail"]["client_id"]
-        client_secret = st.secrets["gmail"]["client_secret"]
-        redirect_uris = st.secrets["gmail"]["redirect_uris"][0]  # Get redirect URIs from secrets.toml
-
-        # Initialize the OAuth flow
-        flow = InstalledAppFlow.from_client_config(
-            {
-                "web": {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "redirect_uris": redirect_uris,  # Correct redirect URI from secrets
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                }
-            },
-            SCOPES,
-        )
-
-        # Generate the authorization URL and prompt the user to authenticate
-        auth_url, _ = flow.authorization_url(prompt='consent')
-        st.info("Click the link below to authenticate with Gmail:")
-        st.markdown(f"[Authorize Gmail Access]({auth_url})", unsafe_allow_html=True)
-
-        # Retrieve the authorization code from the query parameters after user redirects
-        code = st.experimental_get_query_params().get('code', [None])[0]
-        if code:
-            # Fetch the token using the authorization response (full URL)
-            authorization_response = st.experimental_get_url()
-            flow.fetch_token(authorization_response=authorization_response)
-
-            # Get the credentials and create a service
-            creds = flow.credentials
-            service = build('gmail', 'v1', credentials=creds)
-            st.success("Authentication successful!")
-            return service
-        else:
-            st.warning("Please complete the authentication flow by clicking the authorization link.")
-            return None
-
-    except Exception as e:
-        logging.error(f"Authentication failed: {str(e)}")
-        st.error(f"Authentication failed: {str(e)}")
-        return None
-    
-# Fetching Gmail emails
-def fetch_email_snippet(service, message_id: str) -> str:
-    msg = service.users().messages().get(userId='me', id=message_id).execute()
-    return msg.get('snippet', '')
-def fetch_gmail_emails(service: object) -> list:
-    try:
-        results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=30).execute()
-        messages = results.get('messages', [])
-        emails = [fetch_email_snippet(service, message['id']) for message in messages]
-        return emails
-    except Exception as e:
-        logging.error(f"Failed to fetch emails: {str(e)}")
-        st.error(f"Failed to fetch emails: {str(e)}")
-        return []
-    finally:
-        logging.info("Finished fetching emails.")
-        
+ 
 # Extracting URLs from text // add error handling to this
 def extract_urls(text: str) -> list:
     return re.findall(r'(https?://\S+)', text)
@@ -225,30 +160,3 @@ elif option == "SMS Text":
                     st.success(translate_text(f"This SMS is **{prob_not_smishing * 100:.2f}%** safe.", language))  # Now translated
         else:
             st.warning(translate_text("Please enter an SMS text.", language))
-
-            
-elif option == translate_text('Check Gmail', language):
-    # Gmail section
-    if st.session_state.gmail_service is None:
-        st.session_state.gmail_service = authenticate_gmail()
-    if st.session_state.gmail_service:
-        with st.spinner(translate_text("Fetching emails, please wait...", language)):  
-            emails = fetch_gmail_emails(st.session_state.gmail_service)    
-        if emails:
-            link_count = 1 
-            for email in emails:
-                urls = extract_urls(email)
-                if urls:
-                    for url in urls:
-                        st.write(translate_text(f"Link {link_count}: {url}", language))
-                        y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
-                        if y_pred == 1:
-                            st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
-                        else:
-                            st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
-                            report_url = "https://www.cybercrime.gov.in/"
-                            st.write(translate_text("You can report this phishing link at:", language), report_url)
-                            st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
-                        link_count += 1  
-        else:
-            st.warning(translate_text("No links found in your emails.", language))

@@ -5,9 +5,10 @@ import warnings
 import tempfile
 import pickle
 import streamlit as st
-import streamlit.components.v1 as components
 import numpy as np
 import torch
+
+from feature import FeatureExtraction
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -64,89 +65,72 @@ def translate_text(text: str, dest_lang: str) -> str:
     target_lang = lang_dict.get(dest_lang, 'en')  
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
 
-# Google Sign-In HTML/JS Component
-def google_sign_in():
-    google_client_id = "<609520836677-6v4nkac463sdfkko2ifkfg9gn1jilcno.apps.googleusercontent.com>"  # Replace with your Google Client ID
-
-    # HTML and JavaScript for Google Sign-In Button
-    sign_in_html = f"""
-    <div id="g_id_onload"
-        data-client_id="{google_client_id}"
-        data-context="signin"
-        data-ux_mode="popup"
-        data-callback="handleCredentialResponse"
-        data-itp_support="true">
-    </div>
-    <div class="g_id_signin"
-        data-type="standard"
-        data-shape="rectangular"
-        data-theme="outline"
-        data-text="signin_with"
-        data-size="large"
-        data-logo_alignment="left">
-    </div>
-    <script>
-    function handleCredentialResponse(response) {{
-        const iframe = document.createElement("iframe");
-        iframe.style.display = "none";
-        iframe.src = "/?id_token=" + response.credential;
-        document.body.appendChild(iframe);
-    }}
-    </script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>""
-
-    # Embed the sign-in button using Streamlit's components API
-    components.html(sign_in_html, height=500)
-
-    # Handle the token after successful sign-in
-    id_token = st.experimental_get_query_params().get("id_token", [None])[0]
-    if id_token:
-        try:
-            from google.oauth2 import id_token as google_id_token
-            from google.auth.transport.requests import Request
-
-            # Validate and decode the token
-            info = google_id_token.verify_oauth2_token(id_token, Request(), google_client_id)
-            st.success(f"Welcome {info['email']}!")
-            return id_token
-        except ValueError:
-            st.error("Invalid token received. Please try signing in again.")
-            return None
-    else:
-        st.warning("Please sign in to continue.")
-        return None
-
-# Main app logic to display Google Sign-In
-if __name__ == "__main__":
-    token = google_sign_in()
-
-    if token:
-        st.success("Signed in successfully!")
-        # Proceed with other functionality, e.g., checking Gmail
-    else:
-        st.warning("Please sign in to continue.")
-
-
-# Gmail Integration in 'Check Gmail'
-def fetch_gmail_emails(service):
+# Authenticating Gmail API with Redirect Flow
+def authenticate_gmail() -> object:
     try:
-        results = service.users().messages().list(userId='me', labelIds=['INBOX'], q="is:unread").execute()
-        messages = results.get('messages', [])
-        
-        if not messages:
-            return None
-        
-        emails = []
-        for message in messages:
-            msg = service.users().messages().get(userId='me', id=message['id']).execute()
-            email_data = msg['snippet']
-            emails.append(email_data)
-        return emails
-    except Exception as error:
-        st.error(f"An error occurred: {error}")
-        return None
+        # Retrieve OAuth credentials from Streamlit secrets
+        client_id = st.secrets["gmail"]["client_id"]
+        client_secret = st.secrets["gmail"]["client_secret"]
+        redirect_uris = st.secrets["gmail"]["redirect_uris"][0]  # Get redirect URIs from secrets.toml
 
-# Extracting URLs from text
+        # Initialize the OAuth flow
+        flow = InstalledAppFlow.from_client_config(
+            {
+                "web": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uris": redirect_uris,  # Correct redirect URI from secrets
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            },
+            SCOPES,
+        )
+
+        # Generate the authorization URL and prompt the user to authenticate
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        st.info("Click the link below to authenticate with Gmail:")
+        st.markdown(f"[Authorize Gmail Access]({auth_url})", unsafe_allow_html=True)
+
+        # Retrieve the authorization code from the query parameters after user redirects
+        code = st.experimental_get_query_params().get('code', [None])[0]
+        if code:
+            # Fetch the token using the authorization response (full URL)
+            authorization_response = st.experimental_get_url()
+            flow.fetch_token(authorization_response=authorization_response)
+
+            # Get the credentials and create a service
+            creds = flow.credentials
+            service = build('gmail', 'v1', credentials=creds)
+            st.success("Authentication successful!")
+            return service
+        else:
+            st.warning("Please complete the authentication flow by clicking the authorization link.")
+            return None
+
+    except Exception as e:
+        logging.error(f"Authentication failed: {str(e)}")
+        st.error(f"Authentication failed: {str(e)}")
+        return None
+    
+# Fetching Gmail emails
+def fetch_email_snippet(service, message_id: str) -> str:
+    msg = service.users().messages().get(userId='me', id=message_id).execute()
+    return msg.get('snippet', '')
+def fetch_gmail_emails(service: object) -> list:
+    try:
+        results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=30).execute()
+        messages = results.get('messages', [])
+        emails = [fetch_email_snippet(service, message['id']) for message in messages]
+        return emails
+    except Exception as e:
+        logging.error(f"Failed to fetch emails: {str(e)}")
+        st.error(f"Failed to fetch emails: {str(e)}")
+        return []
+    finally:
+        logging.info("Finished fetching emails.")
+        
+# Extracting URLs from text // add error handling to this
 def extract_urls(text: str) -> list:
     return re.findall(r'(https?://\S+)', text)
     
@@ -230,34 +214,41 @@ elif option == "SMS Text":
     sms_text = st.text_area(translate_text("Enter the SMS text:", language))
     if st.button(translate_text("Check SMS", language), help=translate_text("Click to analyze the SMS for scam attempts.", language)):
         if sms_text:
-            with st.spinner(translate_text("Checking SMS...", language)):
-                score_phishing, score_non_phishing = predict_smishing(sms_text)
-                if score_phishing > 0.5:
-                    st.error(translate_text(f"The SMS seems to be a **smishing** attempt with **{score_phishing * 100:.2f}%** likelihood.", language))
+            with st.spinner(translate_text("Checking the SMS...", language)):
+                prob_smishing, prob_not_smishing = predict_smishing(sms_text)
+                if prob_smishing > prob_not_smishing:
+                    report_url = "https://www.cybercrime.gov.in/"
+                    st.error(translate_text(f"It is **{prob_smishing * 100:.2f}%** likely to be a scam attempt.", language))
+                    st.write(translate_text("You can report this SMS at:", language), report_url)
+                    st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
                 else:
-                    st.success(translate_text(f"The SMS appears to be **safe** with **{score_non_phishing * 100:.2f}%** confidence.", language))
+                    st.success(translate_text(f"This SMS is **{prob_not_smishing * 100:.2f}%** safe.", language))  # Now translated
         else:
-            st.warning(translate_text("Please enter the SMS text.", language))
+            st.warning(translate_text("Please enter an SMS text.", language))
 
+            
 elif option == translate_text('Check Gmail', language):
-    # Google Sign-In and Gmail integration
-    credentials = google_sign_in()
-    if credentials:
-        service = build('gmail', 'v1', credentials=credentials)
-        emails = fetch_gmail_emails(service)
+    # Gmail section
+    if st.session_state.gmail_service is None:
+        st.session_state.gmail_service = authenticate_gmail()
+    if st.session_state.gmail_service:
+        with st.spinner(translate_text("Fetching emails, please wait...", language)):  
+            emails = fetch_gmail_emails(st.session_state.gmail_service)    
         if emails:
-            st.write(translate_text("Unread Emails", language))
+            link_count = 1 
             for email in emails:
-                st.write(email)
                 urls = extract_urls(email)
                 if urls:
                     for url in urls:
+                        st.write(translate_text(f"Link {link_count}: {url}", language))
                         y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
                         if y_pred == 1:
-                            st.success(translate_text(f"Phishing link detected in the email: {url}.", language))
+                            st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
                         else:
-                            st.success(translate_text(f"Safe link detected in the email: {url}.", language))
-                else:
-                    st.write(translate_text("No links found in this email.", language))
+                            st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
+                            report_url = "https://www.cybercrime.gov.in/"
+                            st.write(translate_text("You can report this phishing link at:", language), report_url)
+                            st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
+                        link_count += 1  
         else:
-            st.warning(translate_text("No unread emails found.", language))
+            st.warning(translate_text("No links found in your emails.", language))

@@ -123,7 +123,7 @@ if option == translate_text('Enter URL', language):
     # Input URL from user
     st.subheader(translate_text("Enter a URL to check:", language))
     url = st.text_input(translate_text("Enter the URL:", language))
-    if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing or safety.", language)):
+    if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing attempt or not.", language)):
         if url:
             with st.spinner(translate_text("Checking the URL...", language)):
                 y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)

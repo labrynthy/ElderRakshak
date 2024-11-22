@@ -12,11 +12,28 @@ from feature import FeatureExtraction
 from deep_translator import GoogleTranslator
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from sklearn import metrics
+from streamlit.web.server import Server
 
 # Defining Device for computation like CPU or GPU, ignore warnings filter and logging configuration for debugging
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
+
+# Custom function to set HTTP headers for iframe embedding
+def allow_iframe():
+    def set_headers():
+        headers = {
+            "X-Frame-Options": "ALLOWALL",  # Allow embedding in any iframe
+            "Content-Security-Policy": "frame-ancestors *"  # Allow embedding from any domain
+        }
+        for k, v in headers.items():
+            st.experimental_set_query_params(**{k: v})
+    try:
+        Server.get_current()._set_http_headers = set_headers
+    except Exception as e:
+        logging.error(f"Failed to set iframe headers: {e}")
+
+allow_iframe()
 
 # Loading the model
 def load_model(phishing_model_path: str) -> object:
@@ -35,18 +52,18 @@ def load_model(phishing_model_path: str) -> object:
         logging.error(f"Failed to load model: {str(e)}")
         st.error(f"Failed to load model: {str(e)}")
         return None
-    
+
 # Using environment variable for model path
 phishing_model_path = r"pickle/model_new.pkl"
 gbc = load_model(phishing_model_path)
 
-# Translator for multi-language support, using Google Translate API , free has api rate limits
+# Translator for multi-language support, using Google Translate API, free has API rate limits
 @st.cache_data
 def translate_text(text: str, dest_lang: str) -> str:
     lang_dict = {
-        'Hindi': 'hi', 
-        'Telugu': 'te', 
-        'English': 'en', 
+        'Hindi': 'hi',
+        'Telugu': 'te',
+        'English': 'en',
         'Tamil': 'ta',
         'Bengali': 'bn',
         'Marathi': 'mr',
@@ -59,10 +76,14 @@ def translate_text(text: str, dest_lang: str) -> str:
     target_lang = lang_dict.get(dest_lang, 'en')  
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
  
-# Extracting URLs from text // add error handling to this
+# Extracting URLs from text with error handling
 def extract_urls(text: str) -> list:
-    return re.findall(r'(https?://\S+)', text)
-    
+    try:
+        return re.findall(r'(https?://\S+)', text)
+    except Exception as e:
+        logging.error(f"URL extraction failed: {e}")
+        return []
+
 # Making predictions
 def predict_link(link: str) -> tuple:
     try:
@@ -81,7 +102,7 @@ smishing_model_path = r"smishing_model"
 smishing_model = AutoModelForSequenceClassification.from_pretrained(smishing_model_path, trust_remote_code=True).to(device)
 tokenizer = AutoTokenizer.from_pretrained(smishing_model_path, trust_remote_code=True)
 
-# Predicting smishing // scam sms 
+# Predicting smishing // scam SMS
 def predict_smishing(text: str) -> tuple:
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
     with torch.no_grad():
@@ -101,10 +122,10 @@ with st.expander(translate_text("Help", language)):
     st.subheader(translate_text("How to Use the App?", language))
     st.write(translate_text("""
         This app helps you identify phishing links in URLs and SMS texts. Here's how to use it:
-        
-    1. ENTER URL: Paste a URL into the text box and click 'Predict'. The app will analyze the URL and indicate if it is phishing or safe..
+       
+    1. ENTER URL: Paste a URL into the text box and click 'Predict'. The app will analyze the URL and indicate if it is phishing or safe.
     2. SMS TEXT: Paste an SMS text to check if it is a smishing attempt.
-        
+       
     """, language))
 
 st.title(translate_text("Phishing Link and Scam SMS Detector", language))
@@ -112,7 +133,7 @@ st.write(translate_text("Welcome to ElderRakshak's Scam Detection Feature. Selec
 
 # Option to input URL or check SMS
 option = st.radio(
-    translate_text("Choose input method:", language), 
+    translate_text("Choose input method:", language),
     (translate_text('Enter URL', language), translate_text('SMS Text', language))
 )
 
@@ -120,7 +141,6 @@ st.markdown("---")
 
 # Adjusted option checks using English text keys for reliability
 if option == translate_text('Enter URL', language):
-    # Input URL from user
     st.subheader(translate_text("Enter a URL to check:", language))
     url = st.text_input(translate_text("Enter the URL:", language))
     if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing attempt or not.", language)):
@@ -131,7 +151,6 @@ if option == translate_text('Enter URL', language):
                     st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
                 else:
                     st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
-                    # Incident reporting for URL if unsafe
                     report_url = "https://www.cybercrime.gov.in/"
                     st.write(translate_text("You can report this link at:", language), report_url)
                     st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
@@ -139,7 +158,6 @@ if option == translate_text('Enter URL', language):
             st.warning(translate_text("Please enter a URL.", language))
 
 elif option == translate_text('SMS Text', language):
-    # Input SMS text from user
     st.subheader(translate_text("Enter the SMS text to check:", language))
     sms_text = st.text_area(translate_text("Enter the SMS text:", language))
     if st.button(translate_text("Check SMS", language), help=translate_text("Click to analyze the SMS for scam attempts.", language)):

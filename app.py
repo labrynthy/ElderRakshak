@@ -65,75 +65,93 @@ def translate_text(text: str, dest_lang: str) -> str:
     target_lang = lang_dict.get(dest_lang, 'en')  
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
 
-# Authenticating Gmail API with Redirect Flow
-def authenticate_gmail() -> object:
-    try:
-        # Retrieve OAuth credentials from Streamlit secrets
-        client_id = st.secrets["gmail"]["client_id"]
-        client_secret = st.secrets["gmail"]["client_secret"]
-        redirect_uris = st.secrets["gmail"]["redirect_uris"][0]  # Get redirect URIs from secrets.toml
+# Google Sign-In HTML/JS Component
+def google_sign_in():
+    st.markdown("""
+    <div id="g_id_onload"
+        data-client_id="<609520836677-6v4nkac463sdfkko2ifkfg9gn1jilcno.apps.googleusercontent.com>"
+        data-context="signin"
+        data-ux_mode="popup"
+        data-callback="handleCredentialResponse"
+        data-itp_support="true">
+    </div>
+    <div class="g_id_signin"
+        data-type="standard"
+        data-shape="rectangular"
+        data-theme="outline"
+        data-text="signin_with"
+        data-size="large"
+        data-logo_alignment="left">
+    </div>
+    <script>
+    function handleCredentialResponse(response) {
+        const iframe = document.createElement("iframe");
+        iframe.style.display = "none";
+        iframe.src = "/?id_token=" + response.credential;
+        document.body.appendChild(iframe);
+    }
+    </script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    """, unsafe_allow_html=True)
 
-        # Initialize the OAuth flow
-        flow = InstalledAppFlow.from_client_config(
-            {
-                "web": {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "redirect_uris": redirect_uris,  # Correct redirect URI from secrets
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                }
-            },
-            SCOPES,
-        )
+    # Handle token retrieval from the query params
+    id_token = st.experimental_get_query_params().get("id_token", [None])[0]
+    if id_token:
+        try:
+            from google.oauth2 import id_token as google_id_token
+            from google.auth.transport.requests import Request
 
-        # Generate the authorization URL and prompt the user to authenticate
-        auth_url, _ = flow.authorization_url(prompt='consent')
-        st.info("Click the link below to authenticate with Gmail:")
-        st.markdown(f"[Authorize Gmail Access]({auth_url})", unsafe_allow_html=True)
-
-        # Retrieve the authorization code from the query parameters after user redirects
-        code = st.experimental_get_query_params().get('code', [None])[0]
-        if code:
-            # Fetch the token using the authorization response (full URL)
-            authorization_response = st.experimental_get_url()
-            flow.fetch_token(authorization_response=authorization_response)
-
-            # Get the credentials and create a service
-            creds = flow.credentials
-            service = build('gmail', 'v1', credentials=creds)
-            st.success("Authentication successful!")
-            return service
-        else:
-            st.warning("Please complete the authentication flow by clicking the authorization link.")
+            # Validate and decode the token
+            info = google_id_token.verify_oauth2_token(id_token, Request(), "<YOUR_GOOGLE_CLIENT_ID>")
+            st.success(f"Welcome {info['email']}!")
+            return id_token
+        except ValueError:
+            st.error("Invalid token received. Please try signing in again.")
             return None
-
-    except Exception as e:
-        logging.error(f"Authentication failed: {str(e)}")
-        st.error(f"Authentication failed: {str(e)}")
+    else:
+        st.warning("Please sign in to continue.")
         return None
-    
-# Fetching Gmail emails
-def fetch_email_snippet(service, message_id: str) -> str:
-    msg = service.users().messages().get(userId='me', id=message_id).execute()
-    return msg.get('snippet', '')
-def fetch_gmail_emails(service: object) -> list:
-    try:
-        results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=30).execute()
-        messages = results.get('messages', [])
-        emails = [fetch_email_snippet(service, message['id']) for message in messages]
-        return emails
-    except Exception as e:
-        logging.error(f"Failed to fetch emails: {str(e)}")
-        st.error(f"Failed to fetch emails: {str(e)}")
-        return []
-    finally:
-        logging.info("Finished fetching emails.")
+
+
+# Gmail Integration in 'Check Gmail'
+elif option == translate_text('Check Gmail', language):
+    st.subheader(translate_text("Authenticate using your Google Account", language))
+    token = google_sign_in()
+
+    if token:
+        # Fetch emails after successful login
+        service = build('gmail', 'v1', credentials=Credentials(token))
+        with st.spinner(translate_text("Fetching emails, please wait...", language)):
+            emails = fetch_gmail_emails(service)
+
+        if emails:
+            link_count = 1
+            for email in emails:
+                urls = extract_urls(email)
+                if urls:
+                    for url in urls:
+                        st.write(translate_text(f"Link {link_count}: {url}", language))
+                        y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
+                        if y_pred == 1:
+                            st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
+                        else:
+                            st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
+                            report_url = "https://www.cybercrime.gov.in/"
+                            st.write(translate_text("You can report this phishing link at:", language), report_url)
+                            st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
+                        link_count += 1
+        else:
+            st.warning(translate_text("No links found in your emails.", language))
         
-# Extracting URLs from text // add error handling to this
+# Extracting URLs from text with error handling
 def extract_urls(text: str) -> list:
-    return re.findall(r'(https?://\S+)', text)
-    
+    try:
+        return re.findall(r'(https?://\S+)', text)
+    except Exception as e:
+        logging.error(f"Error extracting URLs: {str(e)}")
+        st.error("Failed to extract URLs. Please check the email content.")
+        return []
+
 # Making predictions
 def predict_link(link: str) -> tuple:
     try:
@@ -194,61 +212,23 @@ if option == translate_text('Enter URL', language):
     # Input URL from user
     st.subheader(translate_text("Enter a URL to check:", language))
     url = st.text_input(translate_text("Enter the URL:", language))
-    if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing or safety.", language)):
+    if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing.", language)):
         if url:
-            with st.spinner(translate_text("Checking the URL...", language)):
-                y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
-                if y_pred == 1:
-                    st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
-                else:
-                    st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
-                    # Incident reporting for URL if unsafe
-                    report_url = "https://www.cybercrime.gov.in/"
-                    st.write(translate_text("You can report this link at:", language), report_url)
-                    st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
-        else:
-            st.warning(translate_text("Please enter a URL.", language))
-            
-elif option == "SMS Text":
-    # Input SMS text from user
-    sms_text = st.text_area(translate_text("Enter the SMS text:", language))
-    if st.button(translate_text("Check SMS", language), help=translate_text("Click to analyze the SMS for scam attempts.", language)):
-        if sms_text:
-            with st.spinner(translate_text("Checking the SMS...", language)):
-                prob_smishing, prob_not_smishing = predict_smishing(sms_text)
-                if prob_smishing > prob_not_smishing:
-                    report_url = "https://www.cybercrime.gov.in/"
-                    st.error(translate_text(f"It is **{prob_smishing * 100:.2f}%** likely to be a scam attempt.", language))
-                    st.write(translate_text("You can report this SMS at:", language), report_url)
-                    st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
-                else:
-                    st.success(translate_text(f"This SMS is **{prob_not_smishing * 100:.2f}%** safe.", language))  # Now translated
-        else:
-            st.warning(translate_text("Please enter an SMS text.", language))
+            y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
+            if y_pred == 1:
+                st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
+            else:
+                st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
 
-            
-elif option == translate_text('Check Gmail', language):
-    # Gmail section
-    if st.session_state.gmail_service is None:
-        st.session_state.gmail_service = authenticate_gmail()
-    if st.session_state.gmail_service:
-        with st.spinner(translate_text("Fetching emails, please wait...", language)):  
-            emails = fetch_gmail_emails(st.session_state.gmail_service)    
-        if emails:
-            link_count = 1 
-            for email in emails:
-                urls = extract_urls(email)
-                if urls:
-                    for url in urls:
-                        st.write(translate_text(f"Link {link_count}: {url}", language))
-                        y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
-                        if y_pred == 1:
-                            st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
-                        else:
-                            st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
-                            report_url = "https://www.cybercrime.gov.in/"
-                            st.write(translate_text("You can report this phishing link at:", language), report_url)
-                            st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
-                        link_count += 1  
-        else:
-            st.warning(translate_text("No links found in your emails.", language))
+elif option == translate_text('SMS Text', language):
+    # Check SMS Text for phishing
+    st.subheader(translate_text("Enter SMS Text to check:", language))
+    sms_text = st.text_area(translate_text("Enter SMS content here", language), help=translate_text("Paste the content of the SMS here to check if it's a scam.", language))
+    if st.button(translate_text("Predict", language)):
+        if sms_text:
+            smishing_score, non_smishing_score = predict_smishing(sms_text)
+            if smishing_score > non_smishing_score:
+                st.error(translate_text(f"This SMS is **smishing**. (Score: {smishing_score * 100:.2f}%)", language))
+            else:
+                st.success(translate_text(f"This SMS is **not smishing**. (Score: {non_smishing_score * 100:.2f}%)", language))
+

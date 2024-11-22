@@ -110,6 +110,16 @@ def google_sign_in():
         st.warning("Please sign in to continue.")
         return None
 
+# Main app logic to display Google Sign-In
+if __name__ == "__main__":
+    token = google_sign_in()
+
+    if token:
+        st.success("Signed in successfully!")
+        # Proceed with other functionality, e.g., checking Gmail
+    else:
+        st.warning("Please sign in to continue.")
+
 
 # Gmail Integration in 'Check Gmail'
 def fetch_gmail_emails(service):

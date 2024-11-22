@@ -9,9 +9,6 @@ import numpy as np
 import torch
 
 from feature import FeatureExtraction
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
 from deep_translator import GoogleTranslator
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from sklearn import metrics
@@ -42,9 +39,6 @@ def load_model(phishing_model_path: str) -> object:
 # Using environment variable for model path
 phishing_model_path = r"pickle/model_new.pkl"
 gbc = load_model(phishing_model_path)
-
-# Gmail API setup
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
 # Translator for multi-language support, using Google Translate API , free has api rate limits
 @st.cache_data
@@ -108,9 +102,8 @@ with st.expander(translate_text("Help", language)):
     st.write(translate_text("""
         This app helps you identify phishing links in URLs and SMS texts. Here's how to use it:
         
-    1. ENTER URL: Paste a URL into the text box and click 'Predict'. The app will analyze the URL and indicate if it is phishing or safe.
-    2. CHECK GMAIL: Authenticate using your Gmail account, and the app will check recent emails for any phishing links.
-    3. SMS TEXT: Paste an SMS text to check if it is a smishing attempt.
+    1. ENTER URL: Paste a URL into the text box and click 'Predict'. The app will analyze the URL and indicate if it is phishing or safe..
+    2. SMS TEXT: Paste an SMS text to check if it is a smishing attempt.
         
     """, language))
 
@@ -118,10 +111,7 @@ st.title(translate_text("Phishing Link and Scam SMS Detector", language))
 st.write(translate_text("Welcome to ElderRakshak's Scam Detection Feature. Select your preferred method and start identifying potential phishing and smishing threats now!", language))
 
 # Option to input URL or check Gmail
-option = st.radio(translate_text("Choose input method:", language), (translate_text('Enter URL', language), translate_text('Check Gmail', language), "SMS Text"))
-
-if 'gmail_service' not in st.session_state:
-    st.session_state.gmail_service = None
+option = st.radio(translate_text("Choose input method:", language), (translate_text('Enter URL', language), translate_text('SMS Text', language))
 
 st.markdown("---")
 

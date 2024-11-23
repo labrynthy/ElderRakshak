@@ -35,7 +35,7 @@ def extract_urls(text: str) -> list:
         return []
 
 # Using environment variable for model path
-phishing_model_path = "pickle/model_new.pkl"
+phishing_model_path = r"pickle/model_new.pkl"
 gbc = load_model(phishing_model_path)
 
 # Translator for multi-language support, using Google Translate API , free has api rate limits

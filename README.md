@@ -3,6 +3,7 @@ Phishing Detection and Digital Scam Prevention Web App/Android APK/Extension for
 1. Address the rise in online scams due to rapid digitalization in India.
 2. Focus on protecting older adults and less-educated individuals in urban and rural areas.
 3. Features:
+   
 a) Phishing Link Detection: Leverages an XGBoost model to identify and block malicious URLs, providing robust protection against phishing attacks.
 
 b) Smishing/SMS Scam Detection: A feature designed to identify and flag phishing or scam messages within SMS communications using a TinyBERT NLP model .

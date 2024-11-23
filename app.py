@@ -59,9 +59,21 @@ def translate_text(text: str, dest_lang: str) -> str:
     target_lang = lang_dict.get(dest_lang, 'en')  
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
  
-# Extracting URLs from text // add error handling to this
+# Extracting URLs from text 
 def extract_urls(text: str) -> list:
-    return re.findall(r'(https?://\S+)', text)
+    try:
+        # Extract URLs matching http or https
+        urls = re.findall(r'(https?://\S+)', text)
+        if not urls:
+            raise ValueError("Please ensure to enter a link which starts with 'http://' or 'https://'")
+        return urls
+    except ValueError as e:
+        st.error(str(e))
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error during URL extraction: {str(e)}")
+        st.error("An unexpected error occurred while extracting URLs.")
+        return []
     
 # Making predictions
 def predict_link(link: str) -> tuple:
@@ -118,23 +130,23 @@ option = st.radio(
 
 st.markdown("---")
 
-# Adjusted option checks using English text keys for reliability
+# Input only URl or Link from user
 if option == translate_text('Enter URL', language):
-    # Input URL from user
     st.subheader(translate_text("Enter a URL to check:", language))
     url = st.text_input(translate_text("Enter the URL:", language))
-    if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing attempt or not.", language)):
+    if st.button(translate_text("Predict", language), help=translate_text("Click to analyze the entered URL for phishing or safety.", language)):
         if url:
-            with st.spinner(translate_text("Checking the URL...", language)):
-                y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(url)
-                if y_pred == 1:
-                    st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
-                else:
-                    st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
-                    # Incident reporting for URL if unsafe
-                    report_url = "https://www.cybercrime.gov.in/"
-                    st.write(translate_text("You can report this link at:", language), report_url)
-                    st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
+            with st.spinner(translate_text("Validating the URL...", language)):
+                urls = extract_urls(url) 
+                if urls:
+                    y_pred, y_pro_phishing, y_pro_non_phishing = predict_link(urls[0])  
+                    if y_pred == 1:
+                        st.success(translate_text(f"It is **{y_pro_non_phishing * 100:.2f}%** safe to continue.", language))
+                    else:
+                        st.error(translate_text(f"It is **{y_pro_phishing * 100:.2f}%** unsafe to continue.", language))
+                        report_url = "https://www.cybercrime.gov.in/"
+                        st.write(translate_text("You can report this link at:", language), report_url)
+                        st.markdown(f"[{translate_text('Click here to report', language)}]({report_url})", unsafe_allow_html=True)
         else:
             st.warning(translate_text("Please enter a URL.", language))
 

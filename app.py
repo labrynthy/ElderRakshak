@@ -60,21 +60,20 @@ def translate_text(text: str, dest_lang: str) -> str:
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
  
 # Extracting URLs from text 
-def extract_urls(text: str) -> list:
+def extract_urls(text: str, language: str) -> list:
     try:
-        # Extract URLs matching http or https
         urls = re.findall(r'(https?://\S+)', text)
         if not urls:
-            raise ValueError("Please ensure to enter a link which starts with 'http://' or 'https://'")
+            raise ValueError(translate_text("Please ensure to enter a link which starts with 'http://' or 'https://'", language))
         return urls
     except ValueError as e:
         st.error(str(e))
         return []
     except Exception as e:
         logging.error(f"Unexpected error during URL extraction: {str(e)}")
-        st.error("An unexpected error occurred while extracting URLs.")
+        st.error(translate_text("An unexpected error occurred while extracting URLs.", language))
         return []
-    
+
 # Making predictions
 def predict_link(link: str) -> tuple:
     try:
@@ -130,7 +129,7 @@ option = st.radio(
 
 st.markdown("---")
 
-# Input only URl or Link from user
+# Input only URL or Link from user
 if option == translate_text('Enter URL', language):
     st.subheader(translate_text("Enter a URL to check:", language))
     url = st.text_input(translate_text("Enter the URL:", language))

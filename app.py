@@ -19,23 +19,21 @@ warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 
 # Loading the model
-def load_model(phishing_model_path: str) -> object:
+def extract_urls(text: str) -> list:
     try:
-        with open(phishing_model_path, "rb") as file:
-            return pickle.load(file)
-    except FileNotFoundError:
-        logging.error(f"Model file not found: {phishing_model_path}")
-        st.error("Model file not found. Please check the path.")
-        return None
-    except pickle.UnpicklingError:
-        logging.error("Failed to unpickle the model.")
-        st.error("Failed to load model. The file may be corrupted.")
-        return None
+        # Extract URLs starting with http or https
+        urls = re.findall(r'(https?://\S+)', text)
+        if not urls:
+            raise ValueError("No valid URLs were found in the text. Please include a link starting with 'http' or 'https'.")
+        return urls
+    except ValueError as e:
+        st.error(str(e))
+        return []
     except Exception as e:
-        logging.error(f"Failed to load model: {str(e)}")
-        st.error(f"Failed to load model: {str(e)}")
-        return None
-    
+        logging.error(f"Unexpected error during URL extraction: {str(e)}")
+        st.error("An unexpected error occurred while extracting URLs.")
+        return []
+
 # Using environment variable for model path
 phishing_model_path = r"pickle/model_new.pkl"
 gbc = load_model(phishing_model_path)

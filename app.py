@@ -114,8 +114,8 @@ with st.expander(translate_text("Help", language)):
     st.write(translate_text("""
         This app helps you identify phishing links in URLs and SMS texts. Here's how to use it:
         
-    1. ENTER URL: Paste a URL into the text box and click 'Predict'. The app will analyze the URL and indicate if it is phishing or safe..
-    2. SMS TEXT: Paste an SMS text to check if it is a smishing attempt.
+    1. ENTER URL: Paste a link into the text box and click 'Predict'. The app will analyze and indicate if it is phishing or safe link.
+    2. SMS TEXT : Paste an SMS text to check if it is a smishing or scam attempt.
         
     """, language))
 

@@ -1,5 +1,5 @@
 # ElderRakshak
-Phishing Detection and Digital Scam Prevention Web App/Android APK/Extension for the Elderly in India
+AI-Powered Phishing Detection and Digital Scam Prevention Web App/Android APK/Extension for the Elderly in India
 1. Address the rise in online scams due to rapid digitalization in India.
 2. Focus on protecting older adults and less-educated individuals in urban and rural areas.
 3. Features:

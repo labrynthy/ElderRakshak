@@ -118,8 +118,8 @@ with st.expander(translate_text("Help", language)):
         
     """, language))
 
-st.title(translate_text("Phishing Link and Scam SMS Detector", language))
-st.write(translate_text("Welcome to ElderRakshak's Scam Detection Feature. Select your preferred method and start identifying potential phishing and smishing threats now!", language))
+st.title(translate_text("AI-Powered Phishing Link and Scam SMS Detector", language))
+st.write(translate_text("Welcome to ElderRakshak's AI-Powered Scam Detection Feature. Select your preferred method and start identifying potential phishing and smishing threats now!", language))
 
 # Option to input URL or check SMS
 option = st.radio(

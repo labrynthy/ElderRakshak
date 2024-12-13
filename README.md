@@ -15,3 +15,5 @@ c) (future)Gmail Integration: Authenticates with Gmail (read-only permissions) t
 d) Multi-Language Support: Users can switch between 10 languages providing a more accessible experience for diverse users.
 
 e) Incident Reporting: A built-in mechanism to report phishing links and scam attempts to appropriate authorities, facilitating timely action.
+
+Access the app using the following link - https://elder-rakshak-app.streamlit.app/
